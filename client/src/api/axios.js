@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api'
+  baseURL: 'https://chat-app-server-v0fx.onrender.com'
 });
 
 // Automatically attach token to every request

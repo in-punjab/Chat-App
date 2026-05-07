@@ -9,7 +9,7 @@ export default function useSocket(token) {
   const selectedUserRef = useRef(null);
 
   useEffect(() => {
-    socket = io('http://localhost:5000', { auth: { token } });
+    socket = io('https://chat-app-server-v0fx.onrender.com', { auth: { token } });
     socket.on('online_users', setOnlineUsers);
 
     socket.on('user_typing', ({ sender_id }) => {
