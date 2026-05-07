@@ -5,12 +5,19 @@ export default function useMessages(selectedUser, socket, selectedUserRef, setIs
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
-    if (!socket()) return;
+    const currentSocket = socket();
+    if (!currentSocket) return;
 
-    socket().on('receive_message', (message) => {
+    // Remove old listeners before adding new ones
+    currentSocket.off('receive_message');
+    currentSocket.off('message_sent');
+    currentSocket.off('messages_read');
+    currentSocket.off('message_deleted');
+
+    currentSocket.on('receive_message', (message) => {
       if (selectedUserRef.current?.id === message.sender_id) {
         setMessages((prev) => [...prev, message]);
-        socket().emit('mark_read', { sender_id: message.sender_id });
+        currentSocket.emit('mark_read', { sender_id: message.sender_id });
       } else {
         setUnreadCounts((prev) => ({
           ...prev,
@@ -19,11 +26,15 @@ export default function useMessages(selectedUser, socket, selectedUserRef, setIs
       }
     });
 
-    socket().on('message_sent', (message) => {
-      setMessages((prev) => [...prev, message]);
+    currentSocket.on('message_sent', (message) => {
+      setMessages((prev) => {
+        // Prevent duplicate messages
+        if (prev.find((m) => m.id === message.id)) return prev;
+        return [...prev, message];
+      });
     });
 
-    socket().on('messages_read', ({ by }) => {
+    currentSocket.on('messages_read', ({ by }) => {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.receiver_id === by ? { ...msg, is_read: true } : msg
@@ -31,9 +42,17 @@ export default function useMessages(selectedUser, socket, selectedUserRef, setIs
       );
     });
 
-    socket().on('message_deleted', ({ messageId }) => {
+    currentSocket.on('message_deleted', ({ messageId }) => {
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
     });
+
+    // Cleanup on unmount
+    return () => {
+      currentSocket.off('receive_message');
+      currentSocket.off('message_sent');
+      currentSocket.off('messages_read');
+      currentSocket.off('message_deleted');
+    };
   }, [socket()]);
 
   useEffect(() => {
