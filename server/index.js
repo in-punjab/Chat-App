@@ -1,48 +1,42 @@
-console.log('Step 1: Starting...');
 require('dotenv').config();
-console.log('Step 2: dotenv loaded');
-console.log('PORT:', process.env.PORT);
-console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'exists' : 'MISSING');
-console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'exists' : 'MISSING');
-
 const express = require('express');
-console.log('Step 3: express loaded');
-
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-console.log('Step 4: all imports loaded');
-
 const supabase = require('./supabase');
-console.log('Step 5: supabase loaded');
 
 const authRoutes = require('./routes/auth');
-console.log('Step 6: auth routes loaded');
-
 const userRoutes = require('./routes/users');
-console.log('Step 7: user routes loaded');
-
 const messageRoutes = require('./routes/messages');
-console.log('Step 8: message routes loaded');
 
 const app = express();
 const server = http.createServer(app);
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://chat-app-sandy-sigma-56.vercel.app'
+];
+
+// REST API cors
+app.use(cors({ origin: allowedOrigins }));
+app.use(express.json());
+
+// Socket.IO cors
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: ['GET', 'POST']
   }
 });
-
-app.use(cors());
-app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 
+app.get('/', (req, res) => res.json({ status: 'Server running' }));
+
+// Track online users
 const onlineUsers = {};
 
 io.use((socket, next) => {
@@ -76,8 +70,8 @@ io.on('connection', (socket) => {
 
       const receiverSocketId = onlineUsers[receiver_id];
       if (receiverSocketId) io.to(receiverSocketId).emit('receive_message', message);
-      socket.emit('message_sent', message);
 
+      socket.emit('message_sent', message);
     } catch (err) {
       socket.emit('error', err.message);
     }
@@ -114,12 +108,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Notify other user when message deleted for everyone
   socket.on('delete_for_everyone', ({ messageId, receiver_id }) => {
     const receiverSocketId = onlineUsers[receiver_id];
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit('message_deleted', { messageId });
-    }
+    if (receiverSocketId) io.to(receiverSocketId).emit('message_deleted', { messageId });
   });
 
   socket.on('disconnect', () => {
@@ -129,10 +120,6 @@ io.on('connection', (socket) => {
   });
 });
 
-console.log('Step 9: about to start server...');
-
-server.listen(process.env.PORT || 5000, () => {
-  console.log(`Server running on port ${process.env.PORT || 5000}`);
-}).on('error', (err) => {
-  console.error('Server failed to start:', err.message);
+server.listen(process.env.PORT, () => {
+  console.log(`Server running on port ${process.env.PORT}`);
 });
